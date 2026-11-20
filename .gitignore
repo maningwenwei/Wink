@@ -1,0 +1,41 @@
+# 依赖
+node_modules/
+
+# 构建产物（体积大、可再生成）
+dist/
+dist-*/
+dist-out/
+dist-zip/
+*.exe
+*.msi
+*.zip
+*.7z
+*.blockmap
+
+# 第三方 GPL 引擎二进制（体积大且许可独立，见 THIRD_PARTY_NOTICES.md）
+airplay/
+
+# 临时文件与探针产物
+*.tmp
+*.log
+*.dmp
+zw-test-tmp.js
+sample-*.h264
+moyu-airplay-sample.h264
+
+# IDE / 系统 / 工具
+.vscode/
+.idea/
+.workbuddy/
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+
+# 调试截图（README 用图放在 docs/images/ 下单独提交）
+tools/*.png
+
+# 说明：
+# - package-lock.json 保留提交，确保依赖可复现。
+# - assets/ 下的图标为本项目原创，保留提交。
+# - docs/images/ 下的 README 截图保留提交。

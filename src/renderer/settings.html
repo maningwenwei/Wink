@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <script>
+    /* 首帧之前先把主题定下来：样式表默认是深色，如果系统/用户选的是浅色，
+       不等主进程消息就会先闪一帧深色。Electron 会把 nativeTheme.themeSource
+       映射到 prefers-color-scheme，所以这里读到的就是正确答案。 */
+    document.documentElement.dataset.theme =
+      window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  </script>
+  <link rel="stylesheet" href="settings.css">
+  <title>Wink · 设置</title>
+</head>
+<body>
+<div class="win">
+  <header class="hdr">
+    <div class="brand">
+      <span class="logo">
+        <!-- 与浮窗头像 / 应用图标是同一只小狐狸 -->
+        <img src="../../assets/fox-logo.png" alt="">
+      </span>
+      <div><b>Wink</b><small>设置</small></div>
+    </div>
+    <button class="x" id="btnClose" title="关闭设置">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </header>
+
+  <div class="body">
+    <nav class="side">
+      <button class="tab active" data-tab="general"><i class="ic">01</i>常规</button>
+      <button class="tab" data-tab="hide"><i class="ic">02</i>隐藏</button>
+      <button class="tab" data-tab="content"><i class="ic">03</i>投屏</button>
+      <button class="tab" data-tab="privacy"><i class="ic">04</i>隐私</button>
+      <button class="tab" data-tab="about"><i class="ic">05</i>关于</button>
+      <div class="side-tip" id="sideTip">状态：加载中</div>
+    </nav>
+
+    <div class="content" id="content">
+
+      <!-- 常规 -->
+      <section class="panel active" id="panel-general">
+        <h2>常规</h2>
+        <p class="lead">外观、动效、窗口与声音，改完立即生效。</p>
+        <div class="card">
+          <div class="row"><div class="label"><b>主题</b><small>浅色模式 / 深色模式 / 跟随 Windows 应用模式</small></div>
+            <div class="ctl seg">
+              <label><input type="radio" name="theme" value="light" data-key="theme"><span>浅色</span></label>
+              <label><input type="radio" name="theme" value="dark" data-key="theme"><span>深色</span></label>
+              <label><input type="radio" name="theme" value="system" data-key="theme"><span>跟随系统</span></label>
+            </div>
+          </div>
+          <div class="row"><div class="label"><b>过渡动画</b><small>收起与弹出的时长</small></div><div class="ctl"><input type="range" data-key="animationMs" min="0" max="400" step="10"><output></output></div></div>
+          <div class="row"><div class="label"><b>减少动效</b><small>直接切换，不缩放不淡入</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="reducedMotion"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>不透明度</b><small>略低一点更不打扰</small></div><div class="ctl"><input type="range" data-key="opacity" min="0.6" max="1" step="0.02"><output></output></div></div>
+          <div class="row"><div class="label"><b>窗口置顶</b><small>浮在其他窗口之上</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="alwaysOnTop"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>边缘吸附</b><small>拖到屏幕边缘自动贴住</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="snapToEdge"><span></span></label></div></div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="label"><b>纯净模式</b><small>只留画面，去掉卡通边框与标题栏</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="pureMode"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>允许拖动改变大小</b><small>拖四边或四角；关掉则锁定尺寸</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="resizable"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>内容缩放</b><small>也可在浮窗上 Ctrl + 滚轮</small></div><div class="ctl"><input type="range" data-key="zoom" min="0.5" max="2.5" step="0.05"><output></output></div></div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="label"><b>静音</b><small>网页 + 投屏声音统一静音（绑定系统音量合成器），开机即生效</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="muted"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>隐藏时暂停播放</b><small>仅对浏览器里的网页生效：收起时暂停正在播的视频 / 音频，唤回时续播被我们停下的</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="pauseOnHide"><span></span></label></div></div>
+        </div>
+      </section>
+
+      <!-- 隐藏 -->
+      <section class="panel" id="panel-hide">
+        <h2>隐藏</h2>
+        <p class="lead">按老板键藏起来，或者让鼠标离开时自动收好。</p>
+        <div class="card">
+          <div class="row"><div class="label"><b>老板键</b><small>按一次藏，再按一次现</small></div><div class="ctl"><button class="keycap" id="capHotkey" data-hotkey="hotkey" data-role="boss">Alt+Q</button></div></div>
+          <div class="row"><div class="label"><b>设置快捷键</b><small>隐藏时也能打开本窗口</small></div><div class="ctl"><button class="keycap" id="capSettings" data-hotkey="settingsHotkey" data-role="settings">Alt+Shift+S</button></div></div>
+          <div class="row"><div class="label"><b>鼠标移出自动隐藏</b><small>离开窗口并停留一小会儿；刚启动时不会自动收起，第一次把鼠标移出后才开始生效</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="hideOnMouseLeave"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>边缘窥视恢复</b><small>光标贴住屏幕边缘即可唤出</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="peekEnabled"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>失焦自动隐藏</b><small>切到别的窗口后收起</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="hideOnBlur"><span></span></label></div></div>
+        </div>
+        <div class="card">
+          <details class="adv">
+            <summary>手感微调（一般不用改）</summary>
+            <div class="row"><div class="label"><b>离开判定延时</b><small>防止快速划过误触发</small></div><div class="ctl"><input type="range" data-key="mouseLeaveDelay" min="80" max="1500" step="20"><output></output></div></div>
+            <div class="row"><div class="label"><b>命中区外扩</b><small>边缘容错像素</small></div><div class="ctl"><input type="range" data-key="mousePadding" min="0" max="60" step="2"><output></output></div></div>
+            <div class="row"><div class="label"><b>热区位置</b><small>贴在屏幕哪条边</small></div><div class="ctl"><select data-key="peekEdge"><option value="right">右</option><option value="left">左</option><option value="top">上</option><option value="bottom">下</option></select></div></div>
+            <div class="row"><div class="label"><b>热区宽度</b><small>太宽容易误触</small></div><div class="ctl"><input type="range" data-key="peekWidth" min="3" max="24" step="1"><output></output></div></div>
+            <div class="row"><div class="label"><b>停留时长</b><small>路过不算，需停留</small></div><div class="ctl"><input type="range" data-key="peekDelay" min="80" max="1200" step="20"><output></output></div></div>
+            <div class="row"><div class="label"><b>唤出保护期</b><small>刚出现时不立刻收起</small></div><div class="ctl"><input type="range" data-key="showGraceMs" min="0" max="4000" step="100"><output></output></div></div>
+            <div class="row"><div class="label"><b>失焦延时</b><small>切走多久才收起</small></div><div class="ctl"><input type="range" data-key="blurDelay" min="100" max="3000" step="100"><output></output></div></div>
+            <div class="row"><div class="label"><b>光标轮询间隔</b><small>越小越灵敏，也越吃 CPU</small></div><div class="ctl"><input type="range" data-key="pollInterval" min="16" max="100" step="1"><output></output></div></div>
+          </details>
+        </div>
+      </section>
+
+      <!-- 投屏 -->
+      <section class="panel" id="panel-content">
+        <h2>投屏</h2>
+        <p class="lead">开关和 PIN 在浮窗右上角的胶囊里，这里只配置细节。</p>
+
+        <div class="card">
+          <div class="card-head"><b>iOS 屏幕镜像</b><small>iPhone 控制中心 → 屏幕镜像</small></div>
+          <div class="ap-hero">
+            <div class="ap-pin">
+              <small>PIN</small>
+              <b id="apPinBig">----</b>
+            </div>
+            <div class="ap-meta">
+              <b id="apState">未启动</b>
+              <span id="apPair">—</span>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="pill pill-mint" id="btnAirplayStart">开始接收</button>
+            <button class="pill" id="btnAirplayStop">停止接收</button>
+          </div>
+          <div class="row"><div class="label"><b>设备名</b><small>iPhone 列表里显示的名字</small></div><div class="ctl"><input type="text" data-key="airplayName" spellcheck="false" autocomplete="off"></div></div>
+          <div class="row"><div class="label"><b>画面分辨率</b><small>推荐竖屏 1080（更清晰）· 竖屏手机务必选竖屏框；卡顿可改回竖屏 720</small></div><div class="ctl"><select data-key="airplayResolution"><option value="720x1560">竖屏 720</option><option value="1080x2340">竖屏 1080</option><option value="1280x720">横屏 720</option><option value="1920x1080">横屏 1080</option></select></div></div>
+          <div class="row"><div class="label"><b>帧率</b><small>30 接近手机原速；卡顿可降到 20</small></div><div class="ctl"><input class="num" type="number" min="10" max="60" step="1" data-key="airplayFps"></div></div>
+          <div class="row"><div class="label"><b>投放声音</b><small>开：声音从电脑出来；关：仅投画面 · 手机切音频仍会断投屏</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="airplayCastAudio"><span></span></label></div></div>
+          <div class="note">
+            <p>默认静音且开机即生效；点浮窗上的喇叭按钮即可听到电脑播放的投屏声音，再点一次静音。不影响其它程序的音量。</p>
+          </div>
+
+          <details class="adv">
+            <summary>高级选项</summary>
+            <div class="row"><div class="label"><b>适配手机比例</b><small>首帧到达后把浮窗调成手机宽高比</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="airplayFitWindow"><span></span></label></div></div>
+            <div class="row"><div class="label"><b>投屏时保持显示</b><small>暂停「鼠标移出自动隐藏」</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="airplayKeepVisible"><span></span></label></div></div>
+            <div class="row"><div class="label"><b>断开后自动重连</b><small>断线时保留画面、接收器继续在线，手机上点一次「屏幕镜像」即可接回</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="airplayReconnect"><span></span></label></div></div>
+            <div class="row"><div class="label"><b>隐藏时断开</b><small>默认关：隐藏只暂停画面，保留会话</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="airplayStopOnHide"><span></span></label></div></div>
+            <div class="row"><div class="label"><b>画面适配</b><small>等比 / 铺满 / 拉伸</small></div><div class="ctl"><select data-key="mirrorFit"><option value="contain">等比适应</option><option value="cover">等比铺满</option><option value="fill">拉伸填满</option></select></div></div>
+            <div class="row"><div class="label"><b>免 PIN 兼容模式</b><small>只在排查连接问题时打开</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="airplayNoPin"><span></span></label></div></div>
+            <div class="row"><div class="label"><b>详细投屏日志</b><small>记录手机的 TEARDOWN 类型，排查断线时开一次</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="airplayTrace"><span></span></label></div></div>
+            <div class="row"><div class="label"><b>固定 PIN</b><small>留空则每次随机 4 位</small></div><div class="ctl"><input class="num" type="text" data-key="airplayPin" maxlength="4" spellcheck="false" autocomplete="off"></div></div>
+            <div class="row"><div class="label"><b>接收引擎</b><small>解压引擎组件到程序旁的 airplay/</small></div><div class="ctl"><button class="pill" id="btnAirplayPick">指定 exe</button></div></div>
+            <div class="kv"><span>画面链路</span><code id="apChain">—</code></div>
+            <div class="kv"><span>引擎</span><code id="apEngine">检测中…</code></div>
+            <div class="kv"><span>画面比例</span><code id="apVideo">—</code></div>
+            <p class="fine" id="apHint" hidden></p>
+            <p class="fine" id="apSample" hidden></p>
+            <div class="mono log" id="apLog">引擎日志会显示在这里</div>
+          </details>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><b>显示内容</b><small>也可用浮窗顶部按钮或托盘切换</small></div>
+          <div class="row"><div class="label"><b>当前画面</b><small></small></div>
+            <div class="ctl seg">
+              <label><input type="radio" name="mode" value="idle" data-key="mode"><span>待机</span></label>
+              <label><input type="radio" name="mode" value="web" data-key="mode"><span>网页</span></label>
+              <label><input type="radio" name="mode" value="mirror" data-key="mode"><span>投屏</span></label>
+            </div>
+          </div>
+          <div class="row col"><div class="label"><b>网页地址</b><small>默认不落盘，重启即清空</small></div>
+            <div class="input-row"><input type="text" id="webUrl" placeholder="https://example.com" spellcheck="false" autocomplete="off"><button class="pill pill-mint" id="btnWeb">前往</button></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <details class="adv">
+            <summary>外部视频源与中继（高级）</summary>
+            <div class="row col"><div class="label"><b>外部投屏源</b><small>留空则只用 AirPlay 窗口捕获</small></div>
+              <div class="input-row"><input type="text" id="mirrorSource" placeholder="http://127.0.0.1:xxxx/stream.mjpg" spellcheck="false" autocomplete="off"><button class="pill" id="btnMirror">应用</button></div>
+            </div>
+            <div class="row"><div class="label"><b>中继端口</b><small>改动需重启</small></div><div class="ctl"><input class="num" type="number" data-key="mirrorPort" min="1024" max="65535" step="1"></div></div>
+            <div class="kv"><span>中继状态</span><b id="relayState">读取中</b></div>
+            <div class="kv"><span>推送地址</span><code id="pushUrl">-</code></div>
+            <div class="kv"><span>会话令牌</span><code id="relayToken">-</code></div>
+            <div class="mono" id="pushCmd">node tools/ffmpeg-pusher.js --input &lt;视频源&gt;</div>
+            <div class="btn-row"><button class="pill" id="btnCopy">复制推送命令</button></div>
+          </details>
+        </div>
+      </section>
+
+      <!-- 隐私 -->
+      <section class="panel" id="panel-privacy">
+        <h2>隐私</h2>
+        <p class="lead">默认不出声、不留痕、不进任务栏。</p>
+        <div class="card">
+          <div class="row"><div class="label"><b>防截屏 / 防录屏</b><small>从截图与屏幕共享中剔除</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="contentProtection"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>不进任务栏与 Alt-Tab</b><small>切换窗口时看不到</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="skipTaskbar"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>显示托盘图标</b><small>关掉后只剩快捷键可用</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="trayVisible"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>记住网址</b><small>历史最多留 7 天；关掉则不落盘，收藏不受影响</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="rememberLastUrl"><span></span></label></div></div>
+          <div class="row"><div class="label"><b>开机自启动</b><small>默认关闭</small></div><div class="ctl"><label class="switch"><input type="checkbox" data-key="autoStart"><span></span></label></div></div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="label"><b>清空浏览痕迹</b><small>缓存、Cookie、存储与历史</small></div><div class="ctl"><button class="pill pill-warn" id="btnClear">立即清空</button></div></div>
+        </div>
+        <p class="fine">内容跑在独立 session 分区，与主界面隔离；不采集遥测，配置只写 userData 目录。</p>
+      </section>
+
+      <!-- 关于 -->
+      <section class="panel" id="panel-about">
+        <h2>关于</h2>
+        <p class="lead">Wink · <span id="appVersion">—</span> · Windows</p>
+        <div class="card">
+          <div class="about-block"><b>它是什么</b><p>Wink 是一扇随叫随到的小窗：开网页、看视频、接手机投屏，都在这块地方完成。鼠标移开它会自己收起，移回来或按快捷键就回来。</p></div>
+          <div class="about-block"><b>投屏怎么用</b><p>点小窗上方的「开始接收」，PIN 会显示在画面中央；iPhone 控制中心 → 屏幕镜像 → 选这台电脑 → 输入 PIN。手机和电脑要连同一个 Wi-Fi，第一次启动时防火墙选「允许访问」。</p></div>
+          <div class="about-block"><b>本版更新（1.0.62）</b><p>修好收藏夹和历史记录打不开的问题。隐藏边框时，页面上方那条导航栏是「从上边缘往下长出来」的，这个展开动画会把挂在它下面的下拉面板一起裁掉；现在面板已经挪到动画之外，收藏、历史以及「更多」菜单都能正常弹出。</p></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <footer class="ftr">
+    <button class="link" id="btnReset">恢复默认</button>
+    <span class="msg" id="msg"></span>
+    <button class="pill pill-mint" id="btnDone">完成</button>
+  </footer>
+</div>
+<script src="messages.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

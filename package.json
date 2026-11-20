@@ -1,0 +1,68 @@
+{
+  "name": "moyu-float",
+  "productName": "Wink",
+  "version": "1.0.62",
+  "description": "Wink",
+  "main": "src/main/index.js",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "26.18.0",
+    "koffi": "^2.16.4"
+  },
+  "build": {
+    "appId": "com.moyufloat.float",
+    "productName": "Wink",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "tools/**/*",
+      "package.json"
+    ],
+    "extraFiles": [
+      {
+        "from": "airplay",
+        "to": "airplay"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Wink",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "artifactName": "Wink-${version}-Setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "Wink-${version}-portable.${ext}"
+    }
+  }
+}

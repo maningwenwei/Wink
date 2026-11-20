@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <script>
+    /* 首帧之前先把主题定下来：样式表默认是深色，如果系统/用户选的是浅色，
+       不等主进程消息就会先闪一帧深色。Electron 会把 nativeTheme.themeSource
+       映射到 prefers-color-scheme，所以这里读到的就是正确答案。 */
+    document.documentElement.dataset.theme =
+      window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  </script>
+  <link rel="stylesheet" href="float.css">
+  <title>Wink</title>
+</head>
+<body>
+  <!-- 顶部拖拽横条：挂在 body 下、不放进 .shell。.shell 是独立合成层
+       （isolation + will-change），放在里面会让横条和窗口形状互相牵制；
+       放到 body 层后它是纯粹的浮层，top:0 就等于窗口最顶端。 -->
+  <div class="drag-strip" aria-hidden="true"><i></i></div>
+  <div class="shell" id="shell">
+
+    <header class="topbar">
+      <div class="avatar" aria-hidden="true">
+        <!-- 与安装包图标 / 设置页 logo / 观看页空态是同一只小狐狸 -->
+        <img src="../../assets/fox-logo.png" alt="">
+      </div>
+      <div class="titles">
+        <b>Wink</b>
+        <small id="statusText">待机中</small>
+      </div>
+      <!-- 状态胶囊同时是投屏面板入口：PIN 直接印在这里，不用翻设置 -->
+      <button class="chip" id="modeChip" title="投屏面板">待机</button>
+
+      <div class="tools no-drag">
+        <button class="tool" id="btnMode" title="切换内容 (待机 / 网页 / 投屏)">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 9v11"/>
+          </svg>
+        </button>
+        <button class="tool" id="btnMute" title="静音开关">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 9v6h4l5 4V5L8 9H4z"/><path class="sound-wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>
+            <path class="mute-slash" d="M17 9l5 6M22 9l-5 6"/>
+          </svg>
+        </button>
+        <button class="tool" id="btnPure" title="纯净模式（只留画面，无边框）">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/>
+          </svg>
+        </button>
+        <button class="tool" id="btnSettings" title="打开设置">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+            <path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.2" fill="#241F5C"/><circle cx="15" cy="12" r="2.2" fill="#241F5C"/><circle cx="8" cy="17" r="2.2" fill="#241F5C"/>
+          </svg>
+        </button>
+        <button class="tool tool-primary" id="btnHide" title="立即收起">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+            <path d="M5 12h14"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 网页模式专用浏览条：标签页 + 前进/后退/刷新 + 地址栏。
+         其它模式整条隐藏，不占画面高度。 -->
+    <section class="webbar" id="webBar">
+      <div class="webbar-body">
+        <div class="tabstrip" id="tabStrip"></div>
+        <div class="navrow">
+          <!-- 左上角不放拖拽柄：纯净模式靠浮窗上方的横条 .drag-strip 拖动，
+               底部迷你条另有 .pure-drag。这里再放一个就成了两处重复。 -->
+          <button class="nav-btn" id="navBack" title="后退（Alt+←）">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <button class="nav-btn" id="navFwd" title="前进（Alt+→）">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button class="nav-btn nav-reload" id="navReload" title="刷新（F5）">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4h-4"/></svg>
+          </button>
+          <input class="nav-url" id="navUrl" type="text" spellcheck="false" autocomplete="off" placeholder="输入网址或搜索内容">
+          <!-- 缩放面板的放大镜入口：放在导航栏里，和地址栏同一行；窄窗时随其它低频按钮收进「更多」 -->
+          <button class="nav-btn nav-zoom" id="btnZoom" title="缩放内容">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M7.5 10.5h6M10.5 7.5v6"/>
+            </svg>
+          </button>
+          <button class="nav-btn nav-star" id="navStar" title="收藏本页（Ctrl+D）">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>
+          </button>
+          <button class="nav-btn nav-list" id="navLists" title="收藏夹 / 历史记录">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+          </button>
+          <button class="nav-btn nav-new" id="navNewTab" title="新建标签页（Ctrl+T）">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
+          </button>
+          <!-- 窄窗时上面这些低频按钮（收藏/列表/刷新/新标签）收进这一个「更多」里 -->
+          <button class="nav-btn nav-more" id="navMore" title="更多功能">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- 「更多」下拉：小窗下的低频浏览器功能都在这里 -->
+      <div class="more-pop" id="morePop" hidden>
+        <button class="more-item" id="mMoreBookmarks">收藏夹</button>
+        <button class="more-item" id="mMoreHistory">历史记录</button>
+        <button class="more-item" id="mMoreStar">收藏本页</button>
+        <div class="more-sep"></div>
+        <button class="more-item" id="mMoreReload">刷新页面</button>
+        <button class="more-item" id="mMoreNewTab">新建标签页</button>
+        <div class="more-sep"></div>
+        <div class="more-zoom">
+          <button class="tool" id="mZoomOut" title="缩小"><span>−</span></button>
+          <span class="zoom-label" id="mZoomLabel">100%</span>
+          <button class="tool" id="mZoomIn" title="放大"><span>+</span></button>
+          <button class="tool" id="mZoomReset" title="重置为 100%"><span>1:1</span></button>
+        </div>
+      </div>
+
+      <!-- 收藏 / 历史共用的列表面板 -->
+      <div class="web-list-pop" id="webListPop" hidden>
+        <div class="wlp-head">
+          <button class="wlp-tab active" data-list="bookmarks">收藏</button>
+          <button class="wlp-tab" data-list="history">历史</button>
+          <button class="wlp-close" id="webListClose" title="关闭">×</button>
+        </div>
+        <div class="wlp-body" id="webListBody"></div>
+        <div class="wlp-foot">
+          <button class="wlp-clear" id="webListClear">清空</button>
+          <span class="wlp-tip" id="webListTip"></span>
+        </div>
+      </div>
+
+      <!-- 缩放面板：贴着导航栏里的放大镜弹出，不再浮在浮窗上边框下方 -->
+      <div class="zoom-pop" id="zoomPop" hidden>
+        <!-- 文字必须包在 span 里：.tool::before 是定位元素，裸文本会被 hover 渐变盖住 -->
+        <button class="tool" id="zoomOut" title="缩小"><span>−</span></button>
+        <span class="zoom-label" id="zoomLabel">100%</span>
+        <button class="tool" id="zoomIn" title="放大"><span>+</span></button>
+        <button class="tool" id="zoomReset" title="重置为 100%"><span>1:1</span></button>
+      </div>
+    </section>
+    <!-- 纯净模式的唤出入口：webview 是独立渲染层，宿主收不到它上面的 mousemove，
+         所以只能靠顶部这层薄薄的 DOM 判断「鼠标贴到窗口顶部了」。高度 8px，
+         收起浏览条时它是唯一接管顶部一条像素的东西；浏览条一滑出就自动让位。 -->
+    <div class="webhot" id="webHot" aria-hidden="true"></div>
+
+    <main class="stage">
+      <div class="viewport">
+        <!-- 投屏观看页专用（外部 MJPEG 源）。网页标签页各自一条 webview，放在下面。 -->
+        <!-- allowpopups 必须加：没有它时页面里的 target=_blank / window.open 会被
+             Chromium 在进入 setWindowOpenHandler 之前就拒掉 —— 表现就是「点链接没反应」。
+             真正的窗口创建仍由主进程 deny，再转成自家标签页，不会弹出系统浏览器窗口。
+             不加 nodeintegration：Electron 默认 nodeIntegration=false + contextIsolation=true。 -->
+        <webview id="view" partition="persist:moyu-content" allowpopups></webview>
+        <!-- 网页模式的标签页容器：每个标签页一条独立 webview，各自保留历史与滚动位置 -->
+        <div class="tabviews" id="tabViews"></div>
+        <!-- 投屏画面：直接显示引擎自己解码出来的那扇窗口（桌面捕获流）。
+             放在 webview 之上，只在捕获到流的时候显示。 -->
+        <video id="cap" class="cap" playsinline muted autoplay hidden></video>
+        <!-- vnet 直通画面（默认通道）：主进程从引擎的 -vnet 端口收到 H264 裸码流，
+             交给 vnet-decoder.js 用 WebCodecs 解码后画在这块 canvas 上。
+             没有视频窗口、没有桌面捕获，所以不会再出现「画面比浮窗先到」
+             或「鼠标被吸进画面」那类问题。 -->
+        <canvas id="vnet" hidden></canvas>
+        <div class="loading" id="loading" hidden><span class="spinner"></span></div>
+      </div>
+
+      <section class="idle" id="idle">
+        <div class="idle-art" aria-hidden="true">
+          <img class="fox-big" src="../../assets/fox-full.png" alt="">
+        </div>
+        <div class="idle-title">待机中</div>
+        <p class="idle-desc">选一个内容，或者就这样发会呆</p>
+        <div class="idle-actions">
+          <button class="pill" data-mode="web">打开网页</button>
+          <button class="pill pill-mint" data-mode="mirror">iOS 投屏</button>
+        </div>
+      </section>
+
+      <!-- 接收器已开、手机还没连上：把 PIN 放大摆在这里，手机端照抄即可 -->
+      <section class="wait" id="mirrorWait" hidden>
+        <div class="wait-title" id="waitTitle">等待 iPhone 连接</div>
+        <div class="pin-row" id="pinRow" title="点击复制 PIN">
+          <span class="pin-d">·</span><span class="pin-d">·</span><span class="pin-d">·</span><span class="pin-d">·</span>
+        </div>
+        <p class="wait-desc" id="waitDesc">控制中心 → 屏幕镜像 → 选「Wink」</p>
+        <div class="wait-actions">
+          <button class="pill pill-mint" id="waitStart" hidden>开始接收</button>
+          <button class="pill" id="waitCopy">复制 PIN</button>
+          <button class="pill" id="waitStop">停止接收</button>
+        </div>
+      </section>
+
+      <section class="prompt" id="webEmpty" hidden>
+        <div class="prompt-card">
+          <div class="prompt-title">打开一个网页</div>
+          <p>收藏保存在本机；历史只在打开「记住网址」时保留。内网服务请写全 http://。</p>
+          <div class="input-row">
+            <input id="webUrlInput" type="text" placeholder="例如 example.com" spellcheck="false" autocomplete="off">
+            <button class="pill pill-mint" id="webUrlGo">前往</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="notice" id="notice" hidden></div>
+    </main>
+
+    <footer class="statusbar">
+      <span class="dot" id="dot"></span>
+      <span id="hint">Alt+Q 收起 · 移出自动隐藏</span>
+    </footer>
+
+    <!-- 8 向缩放热区：主进程按方向改窗口矩形，纯净模式下同样可用 -->
+    <div class="resize-layer" id="resizeLayer" aria-hidden="true">
+      <i class="rz rz-n" data-dir="n"></i><i class="rz rz-s" data-dir="s"></i>
+      <i class="rz rz-e" data-dir="e"></i><i class="rz rz-w" data-dir="w"></i>
+      <i class="rz rz-ne" data-dir="ne"></i><i class="rz rz-nw" data-dir="nw"></i>
+      <i class="rz rz-se" data-dir="se"></i><i class="rz rz-sw" data-dir="sw"></i>
+    </div>
+
+    <!-- 投屏面板：开关 + PIN + 设置入口都在浮窗里完成，不用再进设置 -->
+    <div class="cast-pop" id="castPop" hidden>
+      <div class="cast-head">
+        <b>iOS 屏幕镜像</b>
+        <span class="cast-badge" id="castBadge">未开启</span>
+      </div>
+      <button class="cast-pin" id="castPin" hidden title="点击复制 PIN">
+        <span class="cast-pin-digits" id="castPinText">••••</span>
+        <span class="cast-pin-meta"><b>PIN</b><small id="castDevice">Wink</small></span>
+      </button>
+      <p class="cast-help" id="castHelp">点「开始接收」，再用 iPhone 控制中心 → 屏幕镜像连接。</p>
+      <div class="cast-actions">
+        <button class="pill pill-mint" id="castToggle">开始接收</button>
+        <button class="link" id="castMore">更多设置</button>
+      </div>
+    </div>
+
+    <!-- 纯净模式：一条半透明迷你工具条，保留拖动与基本操作，没有卡通边框 -->
+    <div class="pure-controls" id="pureControls">
+      <span class="pure-drag" id="pureDrag" title="按住拖动窗口">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+          <circle cx="5.5" cy="3.5" r="1.5"/><circle cx="10.5" cy="3.5" r="1.5"/>
+          <circle cx="5.5" cy="8" r="1.5"/><circle cx="10.5" cy="8" r="1.5"/>
+          <circle cx="5.5" cy="12.5" r="1.5"/><circle cx="10.5" cy="12.5" r="1.5"/>
+        </svg>
+      </span>
+      <div class="pure-bar">
+        <button class="pure-btn" id="pZoomOut" title="缩小">−</button>
+        <span class="pure-zoom" id="pZoomLabel">100%</span>
+        <button class="pure-btn" id="pZoomIn" title="放大">+</button>
+        <span class="pure-sep"></span>
+        <button class="pure-btn" id="pChrome" title="显示卡通边框">边框</button>
+        <button class="pure-btn" id="pSettings" title="设置">设置</button>
+        <button class="pure-btn" id="pHide" title="立即收起">收起</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="messages.js"></script>
+  <script src="vnet-decoder.js"></script>
+  <script src="float.js"></script>
+</body>
+</html>
